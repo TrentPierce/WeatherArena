@@ -127,11 +127,20 @@ export default function Sidebar() {
                                 else if (metric === 'Wind') displayScore = model.elo_wind || 1200;
                                 else if (metric === 'Dew') displayScore = model.elo_dewpoint || 1200;
 
+                                const mapModelName = (name: string) => {
+                                    if (name === 'gfs_seamless') return 'GFS';
+                                    if (name === 'hrrr') return 'HRRR';
+                                    if (name === 'ecmwf') return 'ECMWF';
+                                    if (name === 'icon_seamless') return 'ICON';
+                                    if (name === 'openmeteo_default') return 'OpenMeteo';
+                                    return name.toUpperCase();
+                                };
+
                                 return (
                                     <div key={model.model_name} className="flex items-center justify-between p-3 rounded-lg glass-card hover:bg-white/5 transition cursor-pointer group">
                                         <div className="flex items-center space-x-3">
                                             <span className={`font-mono font-bold ${index === 0 ? 'text-yellow-400' : 'text-slate-300'}`}>#{index + 1}</span>
-                                            <span className="font-medium group-hover:text-blue-300 transition">{model.model_name}</span>
+                                            <span className="font-medium group-hover:text-blue-300 transition">{mapModelName(model.model_name)}</span>
                                         </div>
                                         <div className="text-right">
                                             <div className="font-bold text-sm bg-slate-800 px-2 py-0.5 rounded">{displayScore.toFixed(0)}</div>

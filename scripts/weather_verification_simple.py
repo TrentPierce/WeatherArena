@@ -117,13 +117,14 @@ def supabase_request(config: Dict[str, Any], method: str, endpoint: str, data: O
         return None
 
 
-def fetch_openmeteo_forecast(lat: float, lon: float) -> Optional[float]:
+def fetch_openmeteo_forecast(lat: float, lon: float, model: str = "best_available") -> Optional[float]:
     """
     Fetch forecast temperature from Open-Meteo API.
 
     Args:
         lat: Latitude coordinate
         lon: Longitude coordinate
+        model: Model name (e.g., 'ecmwf', 'gfs_seamless', 'hrrr', 'icon_seamless')
 
     Returns:
         Forecast temperature in Celsius or None on error
@@ -135,6 +136,9 @@ def fetch_openmeteo_forecast(lat: float, lon: float) -> Optional[float]:
         "current": "temperature_2m",
         "timezone": "auto"
     }
+    
+    if model != "best_available":
+        params["models"] = model
 
     # Add retries for robustness
     import time
@@ -144,12 +148,23 @@ def fetch_openmeteo_forecast(lat: float, lon: float) -> Optional[float]:
             response.raise_for_status()
             data = response.json()
 
-            if "current" not in data:
-                logger.error(f"Forecast API response missing 'current' field")
+            # The field name in response might change if a specific model is requested
+            # Open-Meteo usually returns it in current_weather or under the model name
+            temp = None
+            if "current" in data:
+                temp = data["current"].get("temperature_2m")
+            
+            # Fallback for specific model responses
+            if temp is None and model != "best_available":
+                model_key = f"current_{model}"
+                if model_key in data:
+                    temp = data[model_key].get("temperature_2m")
+
+            if temp is None:
+                logger.error(f"Forecast API response missing temperature for model {model}")
                 return None
 
-            temp = data["current"]["temperature_2m"]
-            logger.info(f"Fetched forecast temperature: {temp}°C")
+            logger.info(f"Fetched {model} forecast temperature: {temp}°C")
             return temp
 
         except requests.RequestException as e:
@@ -399,7 +414,7 @@ def verify_location(
     logger.info(f"Starting verification for {location_code} ({lat}, {lon})")
 
     # Fetch forecast and current temperatures
-    forecast_temp = fetch_openmeteo_forecast(lat, lon)
+    forecast_temp = fetch_openmeteo_forecast(lat, lon, model=model_name)
     actual_temp = fetch_openmeteo_current(lat, lon)
 
     if forecast_temp is None or actual_temp is None:
@@ -469,18 +484,26 @@ def main():
         }
     ]
 
-    # Run verification for each point
+    # Define models to compare
+    models = ["ecmwf", "gfs_seamless", "hrrr", "icon_seamless"]
+    
+    # Run verification for each point and each model
     success_count = 0
-    for point in verification_points:
-        if verify_location(
-            config,
-            point["code"],
-            point["lat"],
-            point["lon"]
-        ):
-            success_count += 1
+    total_attempts = len(verification_points) * len(models)
+    
+    for model in models:
+        logger.info(f"--- Verifying Model: {model.upper()} ---")
+        for point in verification_points:
+            if verify_location(
+                config,
+                point["code"],
+                point["lat"],
+                point["lon"],
+                model_name=model
+            ):
+                success_count += 1
 
-    logger.info(f"Verification complete: {success_count}/{len(verification_points)} locations successful")
+    logger.info(f"Verification complete: {success_count}/{total_attempts} successful")
 
     # Cleanup old records
     cleanup_old_records(config, days=7)
