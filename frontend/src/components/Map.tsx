@@ -1,5 +1,5 @@
 'use client';
-import { MapContainer, TileLayer, ZoomControl, LayersControl } from 'react-leaflet';
+import { MapContainer, TileLayer, ZoomControl, LayersControl, WMSTileLayer } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -38,9 +38,13 @@ export default function Map() {
                 </LayersControl.BaseLayer>
 
                 <LayersControl.Overlay name="Radar (NEXRAD)" checked>
-                    <TileLayer
+                    <WMSTileLayer
+                        url="https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0r.cgi"
+                        layers="nexrad-n0r-900913"
+                        format="image/png"
+                        transparent={true}
                         opacity={0.7}
-                        url="https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0r.cgi?service=WMS&request=GetMap&layers=nexrad-n0r-900913&styles=&format=image/png&transparent=true&version=1.1.1&width=256&height=256&srs=EPSG:3857&bbox={bbox}"
+                        attribution="Iowa State University"
                     />
                 </LayersControl.Overlay>
 
