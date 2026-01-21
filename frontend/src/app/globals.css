@@ -50,17 +50,3 @@ body {
     background: rgba(255, 255, 255, 0.2);
   }
 }
-
-@keyframes radar-sweep {
-  from {
-    transform: translate(-50%, -50%) rotate(0deg);
-  }
-
-  to {
-    transform: translate(-50%, -50%) rotate(360deg);
-  }
-}
-
-.animate-radar-sweep {
-  animation: radar-sweep 6s linear infinite;
-}

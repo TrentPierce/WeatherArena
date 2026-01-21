@@ -1,6 +1,6 @@
 'use client';
 import { MapContainer, TileLayer, ZoomControl, LayersControl, WMSTileLayer, Marker, Tooltip, useMap } from 'react-leaflet';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -20,15 +20,14 @@ export default function Map() {
     const [currentRadar, setCurrentRadar] = useState('composite'); // 'composite' or radar code like 'bmx'
 
     const radarSites = [
-        { name: 'Birmingham, AL', id: 'bmx', layer: 'nexrad-n0r-bmx', lat: 33.172, lon: -86.770 },
-        { name: 'Jackson, MS', id: 'jan', layer: 'nexrad-n0r-jan', lat: 32.318, lon: -90.078 },
-        { name: 'New York, NY', id: 'okx', layer: 'nexrad-n0r-okx', lat: 40.865, lon: -72.863 },
-        { name: 'Los Angeles, CA', id: 'vqx', layer: 'nexrad-n0r-vqx', lat: 34.412, lon: -119.179 },
-        { name: 'Chicago, IL', id: 'lot', layer: 'nexrad-n0r-lot', lat: 41.604, lon: -88.085 },
+        { name: 'Birmingham, AL', id: 'bmx', lat: 33.172, lon: -86.770 },
+        { name: 'Jackson, MS', id: 'jan', lat: 32.318, lon: -90.078 },
+        { name: 'New York, NY', id: 'okx', lat: 40.865, lon: -72.863 },
+        { name: 'Los Angeles, CA', id: 'vqx', lat: 34.412, lon: -119.179 },
+        { name: 'Chicago, IL', id: 'lot', lat: 41.604, lon: -88.085 },
     ];
 
     const activeSite = radarSites.find(s => s.id === currentRadar);
-    const activeLayer = activeSite?.layer || 'nexrad-n0r-900913';
 
     // Custom Radar Icon
     const radarIcon = L.divIcon({
@@ -66,25 +65,7 @@ export default function Map() {
         useEffect(() => {
             map.setView(viewCenter, viewZoom, { animate: true, duration: 1.5 });
         }, [viewCenter, viewZoom]);
-
-        // Radar Sweep centered on active site
-        const beamCenter = activeSite ? map.latLngToContainerPoint([activeSite.lat, activeSite.lon]) : map.latLngToContainerPoint(viewCenter);
-
-        return (
-            <div
-                className="absolute inset-0 pointer-events-none z-[1000] overflow-hidden opacity-20"
-                style={{ clipPath: 'inset(0 0 0 0)' }}
-            >
-                <div
-                    className="absolute w-[200vmax] h-[200vmax] bg-[conic-gradient(from_0deg,transparent_0deg,rgba(52,211,153,0.5)_15deg,transparent_30deg)] animate-radar-sweep"
-                    style={{
-                        left: `${beamCenter.x}px`,
-                        top: `${beamCenter.y}px`,
-                        transform: 'translate(-50%, -50%)'
-                    }}
-                ></div>
-            </div>
-        );
+        return null;
     }
 
     return (
@@ -112,15 +93,27 @@ export default function Map() {
                     </LayersControl.BaseLayer>
 
                     <LayersControl.Overlay name="Radar (NEXRAD)" checked>
-                        <WMSTileLayer
-                            key={`${radarTime}-${currentRadar}`}
-                            url="https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0r.cgi"
-                            layers={activeLayer}
-                            format="image/png"
-                            transparent={true}
-                            opacity={0.7}
-                            attribution="Iowa State University"
-                        />
+                        {currentRadar === 'composite' ? (
+                            <WMSTileLayer
+                                key={`${radarTime}-${currentRadar}`}
+                                url="https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi"
+                                layers="nexrad-n0q"
+                                format="image/png"
+                                transparent={true}
+                                opacity={0.7}
+                                attribution="Iowa State University"
+                            />
+                        ) : (
+                            <WMSTileLayer
+                                key={`${radarTime}-${currentRadar}`}
+                                url={`https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/ridge.cgi?sector=${activeSite?.id}&prod=N0Q`}
+                                layers="single"
+                                format="image/png"
+                                transparent={true}
+                                opacity={0.8}
+                                attribution="Iowa State University RIDGE"
+                            />
+                        )}
                     </LayersControl.Overlay>
 
                     <LayersControl.Overlay name="HRRR Temperature (2m)">

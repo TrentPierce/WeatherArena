@@ -18,7 +18,7 @@ type Metric = 'Composite' | 'Temp' | 'Wind' | 'Dew';
 export default function Sidebar() {
     const [rankings, setRankings] = useState<Ranking[]>([]);
     const [loading, setLoading] = useState(true);
-    const [metric, setMetric] = useState<Metric>('Temp');
+    const [metric, setMetric] = useState<Metric>('Composite');
 
     useEffect(() => {
         if (!supabase) {
@@ -95,7 +95,7 @@ export default function Sidebar() {
                             <LucideTrophy className="w-4 h-4 mr-2 text-yellow-500" /> Leaderboard
                         </h2>
                         <div className="flex bg-slate-800 rounded p-1">
-                            {(['Temp', 'Wind', 'Dew'] as Metric[]).map(c => (
+                            {(['Composite', 'Temp', 'Wind', 'Dew'] as Metric[]).map(c => (
                                 <button
                                     key={c}
                                     onClick={() => setMetric(c)}
