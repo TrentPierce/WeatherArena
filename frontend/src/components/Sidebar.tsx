@@ -30,7 +30,7 @@ export default function Sidebar() {
 
         const subscription = supabase
             .channel('public:model_rankings')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'model_rankings' }, (payload) => {
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'model_rankings' }, () => {
                 fetchRankings();
             })
             .subscribe();
