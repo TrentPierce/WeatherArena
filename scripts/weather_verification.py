@@ -29,12 +29,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def get_supabase_http_client() -> Optional[Dict[str, Any]]:
+def get_supabase_http_config() -> Optional[Dict[str, Any]]:
     """
-    Create and return a Supabase HTTP client configuration.
+    Get Supabase HTTP configuration.
 
     Returns:
-        Dictionary with base_url and headers for making HTTP requests
+        Dictionary with base_url and headers or None if credentials missing
     """
     supabase_url = os.getenv('SUPABASE_URL')
     supabase_key = os.getenv('SUPABASE_KEY')
@@ -44,13 +44,12 @@ def get_supabase_http_client() -> Optional[Dict[str, Any]]:
         return None
 
     try:
-        # For Supabase, we need to use the /rest/v1 endpoint
         base_url = supabase_url.rstrip('/') + '/rest/v1'
-        
         headers = {
             'apikey': supabase_key,
             'Authorization': f'Bearer {supabase_key}',
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
         }
         
         logger.info("Successfully configured Supabase HTTP client")
@@ -60,6 +59,54 @@ def get_supabase_http_client() -> Optional[Dict[str, Any]]:
         }
     except Exception as e:
         logger.error(f"Failed to configure Supabase HTTP client: {e}")
+        return None
+
+
+def supabase_request(config: Dict[str, Any], method: str, endpoint: str, data: Optional[Dict] = None) -> Any:
+    """
+    Make a request to Supabase REST API.
+
+    Args:
+        config: Supabase configuration
+        method: HTTP method (GET, POST, etc.)
+        endpoint: API endpoint (e.g., 'model_verification_logs')
+        data: Request data for POST/PUT requests
+
+    Returns:
+        Response data or None on error
+    """
+    try:
+        url = f"{config['base_url']}/{endpoint}"
+        
+        if method.upper() == 'GET':
+            response = requests.get(url, headers=config['headers'], timeout=30)
+        elif method.upper() == 'POST':
+            response = requests.post(url, headers=config['headers'], json=data, timeout=30)
+        elif method.upper() == 'PUT':
+            response = requests.put(url, headers=config['headers'], json=data, timeout=30)
+        elif method.upper() == 'PATCH':
+            response = requests.patch(url, headers=config['headers'], json=data, timeout=30)
+        elif method.upper() == 'DELETE':
+            response = requests.delete(url, headers=config['headers'], timeout=30)
+        else:
+            logger.error(f"Unsupported HTTP method: {method}")
+            return None
+
+        response.raise_for_status()
+        
+        if response.text.strip():
+            return response.json()
+        else:
+            return []
+
+    except requests.RequestException as e:
+        logger.error(f"Supabase request failed: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            logger.error(f"Response status: {e.response.status_code}")
+            logger.error(f"Response text: {e.response.text}")
+        return None
+    except Exception as e:
+        logger.error(f"Supabase request failed with unexpected error: {e}")
         return None
 
 
@@ -152,7 +199,7 @@ def calculate_error(forecast_temp: float, actual_temp: float) -> float:
 
 
 def insert_verification_result(
-    db: SyncPostgrestClient,
+    config: Dict[str, Any],
     location_code: str,
     lat: float,
     lon: float,
@@ -165,7 +212,7 @@ def insert_verification_result(
     Insert verification result into model_verification_logs table.
 
     Args:
-        db: Postgrest client
+        config: Supabase configuration
         location_code: Location identifier (e.g., 'JFK')
         lat: Latitude
         lon: Longitude
@@ -180,7 +227,7 @@ def insert_verification_result(
     try:
         now = datetime.utcnow().isoformat()
 
-        db.table('model_verification_logs').insert({
+        data = {
             'model_name': model_name,
             'location_code': location_code,
             'latitude': lat,
@@ -190,51 +237,53 @@ def insert_verification_result(
             'error_value': error_value,
             'forecast_timestamp': now,
             'observation_timestamp': now
-        }).execute()
+        }
 
-        logger.info(f"Inserted verification result for {location_code}: error={error_value}°C")
-        return True
+        result = supabase_request(config, 'POST', 'model_verification_logs', data)
+
+        if result is not None:
+            logger.info(f"Inserted verification result for {location_code}: error={error_value}°C")
+            return True
+        else:
+            return False
 
     except Exception as e:
         logger.error(f"Failed to insert verification result: {e}")
         return False
 
 
-def cleanup_old_records(db: SyncPostgrestClient, days: int = 7) -> Optional[int]:
+def cleanup_old_records(config: Dict[str, Any], days: int = 7) -> Optional[int]:
     """
     Delete verification records older than specified days.
 
     Args:
-        db: Postgrest client
+        config: Supabase configuration
         days: Number of days to retain records
 
     Returns:
         Number of deleted records or None on error
     """
     try:
-        cutoff_date = datetime.utcnow().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
+        result = supabase_request(config, 'POST', 'rpc/cleanup_old_verification_logs', {'days_old': days})
 
-        result = db.rpc('cleanup_old_verification_logs', {
-            'days_old': days
-        }).execute()
-
-        deleted_count = result.data
-        logger.info(f"Cleaned up {deleted_count} old records (older than {days} days)")
-        return deleted_count
+        if result is not None:
+            deleted_count = result if isinstance(result, int) else 0
+            logger.info(f"Cleaned up {deleted_count} old records (older than {days} days)")
+            return deleted_count
+        else:
+            return None
 
     except Exception as e:
         logger.error(f"Failed to cleanup old records: {e}")
         return None
 
 
-def update_model_ranking(db: SyncPostgrestClient, model_name: str, error_value: float) -> bool:
+def update_model_ranking(config: Dict[str, Any], model_name: str, error_value: float) -> bool:
     """
     Update model rankings with new verification data.
 
     Args:
-        db: Supabase client
+        config: Supabase configuration
         model_name: Name of the weather model
         error_value: Error value from verification
 
@@ -243,13 +292,11 @@ def update_model_ranking(db: SyncPostgrestClient, model_name: str, error_value: 
     """
     try:
         # Check if model exists
-        existing = db.table('model_rankings').select(
-            'id', 'elo_score', 'total_verifications', 'average_error'
-        ).eq('model_name', model_name).execute()
+        existing = supabase_request(config, 'GET', f"model_rankings?model_name=eq.{model_name}")
 
-        if existing.data:
+        if existing and len(existing) > 0:
             # Update existing model
-            current = existing.data[0]
+            current = existing[0]
             new_total = current['total_verifications'] + 1
             current_avg = current['average_error'] or 0
             new_avg = ((current_avg * current['total_verifications']) + error_value) / new_total
@@ -258,25 +305,38 @@ def update_model_ranking(db: SyncPostgrestClient, model_name: str, error_value: 
             elo_adjustment = 10 - error_value  # Lower error = higher ELO gain
             new_elo = current['elo_score'] + elo_adjustment
 
-            db.table('model_rankings').update({
+            update_data = {
                 'elo_score': new_elo,
                 'total_verifications': new_total,
                 'average_error': new_avg,
                 'last_updated': datetime.utcnow().isoformat()
-            }).eq('model_name', model_name).execute()
+            }
+
+            result = supabase_request(config, 'PATCH', f"model_rankings?id=eq.{current['id']}", update_data)
+
+            if result is not None:
+                logger.info(f"Updated ranking for {model_name}")
+                return True
+            else:
+                return False
         else:
             # Create new model entry
             new_elo = 1000 + (10 - error_value)
-            db.table('model_rankings').insert({
+            new_data = {
                 'model_name': model_name,
                 'elo_score': new_elo,
                 'total_verifications': 1,
                 'average_error': error_value,
                 'last_updated': datetime.utcnow().isoformat()
-            }).execute()
+            }
 
-        logger.info(f"Updated ranking for {model_name}")
-        return True
+            result = supabase_request(config, 'POST', 'model_rankings', new_data)
+
+            if result is not None:
+                logger.info(f"Created new ranking for {model_name}")
+                return True
+            else:
+                return False
 
     except Exception as e:
         logger.error(f"Failed to update model ranking: {e}")
@@ -284,7 +344,7 @@ def update_model_ranking(db: SyncPostgrestClient, model_name: str, error_value: 
 
 
 def verify_location(
-    db: SyncPostgrestClient,
+    config: Dict[str, Any],
     location_code: str,
     lat: float,
     lon: float,
@@ -294,7 +354,7 @@ def verify_location(
     Run full verification for a single location.
 
     Args:
-        db: Postgrest client
+        config: Supabase configuration
         location_code: Location identifier
         lat: Latitude
         lon: Longitude
@@ -319,13 +379,13 @@ def verify_location(
 
     # Store in database
     success = insert_verification_result(
-        db, location_code, lat, lon,
+        config, location_code, lat, lon,
         forecast_temp, actual_temp, error_value, model_name
     )
 
     if success:
         # Update rankings
-        update_model_ranking(db, model_name, error_value)
+        update_model_ranking(config, model_name, error_value)
 
     return success
 
@@ -336,9 +396,9 @@ def main():
     logger.info("WeatherArena Verification Pipeline - Starting")
     logger.info("=" * 60)
 
-    # Get database client
-    db = get_postgrest_client()
-    if not db:
+    # Get database configuration
+    config = get_supabase_http_config()
+    if not config:
         logger.error("Failed to initialize database connection. Exiting.")
         return
 
@@ -357,7 +417,7 @@ def main():
     success_count = 0
     for point in verification_points:
         if verify_location(
-            db,
+            config,
             point["code"],
             point["lat"],
             point["lon"]
@@ -367,7 +427,7 @@ def main():
     logger.info(f"Verification complete: {success_count}/{len(verification_points)} locations successful")
 
     # Cleanup old records
-    cleanup_old_records(db, days=7)
+    cleanup_old_records(config, days=7)
 
     logger.info("=" * 60)
     logger.info("WeatherArena Verification Pipeline - Complete")

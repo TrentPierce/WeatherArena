@@ -416,15 +416,38 @@ def main():
         logger.error("Failed to initialize database connection. Exiting.")
         return
 
-    # Define verification points (starting with JFK)
+    # Define verification points (major US cities and airports)
     verification_points = [
         {
             "code": "JFK",
             "name": "John F. Kennedy International Airport",
             "lat": 40.6413,
             "lon": -73.7781
+        },
+        {
+            "code": "LAX",
+            "name": "Los Angeles International Airport",
+            "lat": 33.9425,
+            "lon": -118.4081
+        },
+        {
+            "code": "ORD",
+            "name": "O'Hare International Airport",
+            "lat": 41.9786,
+            "lon": -87.9047
+        },
+        {
+            "code": "BHM",
+            "name": "Birmingham, Alabama",
+            "lat": 33.5186,
+            "lon": -86.8104
+        },
+        {
+            "code": "JAN",
+            "name": "Jackson, Mississippi",
+            "lat": 32.3117,
+            "lon": -90.2056
         }
-        # Add more airports here as needed
     ]
 
     # Run verification for each point
