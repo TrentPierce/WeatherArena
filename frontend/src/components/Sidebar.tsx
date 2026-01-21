@@ -1,7 +1,7 @@
 'use client';
 import { LucideTrophy, LucideTrendingUp, LucideInfo, LucideLoader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from './supabaseClient';
 
 type Ranking = {
     model_name: string;
