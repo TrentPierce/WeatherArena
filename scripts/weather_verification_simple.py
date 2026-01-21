@@ -98,10 +98,13 @@ def supabase_request(config: Dict[str, Any], method: str, endpoint: str, data: O
         # Debug: print response text
         logger.debug(f"Response text: {response.text}")
         
-        if response.text.strip():
-            return response.json()
-        else:
-            return []
+        # Return True for success status codes with empty body (like 204)
+        if response.status_code in (200, 201, 204):
+            if response.text.strip():
+                return response.json()
+            return True
+        
+        return None
 
     except requests.RequestException as e:
         logger.error(f"Supabase request failed: {e}")
@@ -133,22 +136,29 @@ def fetch_openmeteo_forecast(lat: float, lon: float) -> Optional[float]:
         "timezone": "auto"
     }
 
-    try:
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
-        data = response.json()
+    # Add retries for robustness
+    import time
+    for attempt in range(3):
+        try:
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
 
-        if "current" not in data:
-            logger.error(f"Forecast API response missing 'current' field")
-            return None
+            if "current" not in data:
+                logger.error(f"Forecast API response missing 'current' field")
+                return None
 
-        temp = data["current"]["temperature_2m"]
-        logger.info(f"Fetched forecast temperature: {temp}°C")
-        return temp
+            temp = data["current"]["temperature_2m"]
+            logger.info(f"Fetched forecast temperature: {temp}°C")
+            return temp
 
-    except requests.RequestException as e:
-        logger.error(f"Failed to fetch forecast from Open-Meteo: {e}")
-        return None
+        except requests.RequestException as e:
+            logger.warning(f"Attempt {attempt+1}/3 failed to fetch forecast: {e}")
+            if attempt < 2:
+                time.sleep(2)  # Wait 2 seconds before retry
+            else:
+                logger.error(f"Failed to fetch forecast from Open-Meteo after 3 attempts")
+                return None
 
 
 def fetch_openmeteo_current(lat: float, lon: float) -> Optional[float]:
@@ -170,22 +180,29 @@ def fetch_openmeteo_current(lat: float, lon: float) -> Optional[float]:
         "hourly": "temperature_2m"
     }
 
-    try:
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
-        data = response.json()
+    # Add retries for robustness
+    import time
+    for attempt in range(3):
+        try:
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
 
-        if "current" not in data:
-            logger.error(f"Current weather API response missing 'current' field")
-            return None
+            if "current" not in data:
+                logger.error(f"Current weather API response missing 'current' field")
+                return None
 
-        temp = data["current"]["temperature_2m"]
-        logger.info(f"Fetched current temperature: {temp}°C")
-        return temp
+            temp = data["current"]["temperature_2m"]
+            logger.info(f"Fetched current temperature: {temp}°C")
+            return temp
 
-    except requests.RequestException as e:
-        logger.error(f"Failed to fetch current weather from Open-Meteo: {e}")
-        return None
+        except requests.RequestException as e:
+            logger.warning(f"Attempt {attempt+1}/3 failed to fetch current weather: {e}")
+            if attempt < 2:
+                time.sleep(2)
+            else:
+                logger.error(f"Failed to fetch current weather from Open-Meteo after 3 attempts")
+                return None
 
 
 def calculate_error(forecast_temp: float, actual_temp: float) -> float:

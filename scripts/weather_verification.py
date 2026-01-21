@@ -94,10 +94,13 @@ def supabase_request(config: Dict[str, Any], method: str, endpoint: str, data: O
 
         response.raise_for_status()
         
-        if response.text.strip():
-            return response.json()
-        else:
-            return []
+        # Return True for success status codes with empty body (like 204)
+        if response.status_code in (200, 201, 204):
+            if response.text.strip():
+                return response.json()
+            return True
+        
+        return None
 
     except requests.RequestException as e:
         logger.error(f"Supabase request failed: {e}")
