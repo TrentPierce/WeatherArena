@@ -214,7 +214,7 @@
     </div>
 
     <footer>
-        <p>WeatherArena © 2026 | Powered by Open-Meteo & Supabase</p>
+        <p>WeatherArena © 2026 | Powered by Open-Meteo & Supabase | v1.1</p>
         <p style="margin-top: 10px; font-size: 0.8em;">
             Data updates hourly | <a href="https://github.com/TrentPierce/WeatherArena" target="_blank"
                 style="color: #3b82f6;">View on GitHub</a>
@@ -270,13 +270,13 @@
                 rankingsBody.innerHTML = '';
 
                 if (rankings.length === 0) {
-                    rankingsBody.innerHTML = '
-                        < tr >
-                        <td colspan="6" style="text-align: center; padding: 40px; color: #6b7280;">
-                            No rankings data available yet. Check back after the first verification run.
-                        </td>
-                        </tr >
-                        ';
+                    rankingsBody.innerHTML = `
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 40px; color: #6b7280;">
+                                No rankings data available yet. Check back after the first verification run.
+                            </td>
+                        </tr>
+                    `;
                 } else {
                     rankings.forEach((model, index) => {
                         const row = document.createElement('tr');
