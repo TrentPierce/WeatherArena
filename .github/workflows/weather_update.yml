@@ -32,8 +32,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run weather verification pipeline
-        run: |
-          python scripts/weather_verification.py
+        run: python scripts/weather_verification_simple.py
 
       - name: Verify execution
         if: always()
