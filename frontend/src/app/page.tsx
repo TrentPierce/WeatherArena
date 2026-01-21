@@ -1,5 +1,5 @@
-import MapWrapper from '@/components/MapWrapper';
-import Sidebar from '@/components/Sidebar';
+import MapWrapper from '../components/MapWrapper';
+import Sidebar from '../components/Sidebar';
 
 export default function Home() {
   return (
