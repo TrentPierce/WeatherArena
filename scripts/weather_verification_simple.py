@@ -85,6 +85,8 @@ def supabase_request(config: Dict[str, Any], method: str, endpoint: str, data: O
             response = requests.post(url, headers=config['headers'], json=data)
         elif method.upper() == 'PUT':
             response = requests.put(url, headers=config['headers'], json=data)
+        elif method.upper() == 'PATCH':
+            response = requests.patch(url, headers=config['headers'], json=data)
         elif method.upper() == 'DELETE':
             response = requests.delete(url, headers=config['headers'])
         else:
@@ -324,7 +326,7 @@ def update_model_ranking(config: Dict[str, Any], model_name: str, error_value: f
                 'last_updated': datetime.utcnow().isoformat()
             }
 
-            result = supabase_request(config, 'PUT', f"model_rankings?id=eq.{current['id']}", update_data)
+            result = supabase_request(config, 'PATCH', f"model_rankings?id=eq.{current['id']}", update_data)
             
             if result:
                 logger.info(f"Updated ranking for {model_name}")
