@@ -1,3 +1,4 @@
+'use client';
 import { LucideTrophy, LucideTrendingUp, LucideInfo, LucideLoader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -20,12 +21,18 @@ export default function Sidebar() {
     const [metric, setMetric] = useState<Metric>('Temp');
 
     useEffect(() => {
+        if (!supabase) {
+            setLoading(false);
+            return;
+        }
+
         fetchRankings();
 
-        // Subscribe to real-time changes
         const subscription = supabase
             .channel('public:model_rankings')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'model_rankings' }, fetchRankings)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'model_rankings' }, (payload) => {
+                fetchRankings();
+            })
             .subscribe();
 
         return () => {
@@ -34,6 +41,8 @@ export default function Sidebar() {
     }, []);
 
     const fetchRankings = async () => {
+        if (!supabase) return;
+
         try {
             const { data, error } = await supabase
                 .from('model_rankings')
@@ -101,6 +110,10 @@ export default function Sidebar() {
                     {loading ? (
                         <div className="flex justify-center py-8">
                             <LucideLoader2 className="animate-spin text-slate-500" />
+                        </div>
+                    ) : !supabase ? (
+                        <div className="text-center py-4 text-red-400 text-xs p-2 bg-red-900/20 rounded">
+                            Configuration Error: Missing API Keys
                         </div>
                     ) : sortedRankings.length === 0 ? (
                         <div className="text-center py-4 text-slate-500 text-xs italic">
