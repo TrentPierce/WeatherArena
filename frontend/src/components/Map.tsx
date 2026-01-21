@@ -1,6 +1,6 @@
 'use client';
-import { MapContainer, TileLayer, ZoomControl, LayersControl, WMSTileLayer, Marker, Tooltip } from 'react-leaflet';
-import { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, ZoomControl, LayersControl, WMSTileLayer, Marker, Tooltip, useMap } from 'react-leaflet';
+import { useState, useEffect, useRef } from 'react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -20,11 +20,11 @@ export default function Map() {
     const [currentRadar, setCurrentRadar] = useState('composite'); // 'composite' or radar code like 'bmx'
 
     const radarSites = [
-        { name: 'Birmingham, AL', id: 'bmx', layer: 'rid-bmx-n0r', lat: 33.172, lon: -86.770 },
-        { name: 'Jackson, MS', id: 'jan', layer: 'rid-jan-n0r', lat: 32.318, lon: -90.078 },
-        { name: 'New York, NY', id: 'okx', layer: 'rid-okx-n0r', lat: 40.865, lon: -72.863 },
-        { name: 'Los Angeles, CA', id: 'lox', layer: 'rid-lox-n0r', lat: 34.412, lon: -119.179 },
-        { name: 'Chicago, IL', id: 'lot', layer: 'rid-lot-n0r', lat: 41.604, lon: -88.085 },
+        { name: 'Birmingham, AL', id: 'bmx', layer: 'nexrad-n0r-bmx', lat: 33.172, lon: -86.770 },
+        { name: 'Jackson, MS', id: 'jan', layer: 'nexrad-n0r-jan', lat: 32.318, lon: -90.078 },
+        { name: 'New York, NY', id: 'okx', layer: 'nexrad-n0r-okx', lat: 40.865, lon: -72.863 },
+        { name: 'Los Angeles, CA', id: 'vqx', layer: 'nexrad-n0r-vqx', lat: 34.412, lon: -119.179 },
+        { name: 'Chicago, IL', id: 'lot', layer: 'nexrad-n0r-lot', lat: 41.604, lon: -88.085 },
     ];
 
     const activeSite = radarSites.find(s => s.id === currentRadar);
@@ -38,6 +38,9 @@ export default function Map() {
         iconAnchor: [8, 8]
     });
 
+    const [viewCenter, setViewCenter] = useState<[number, number]>([39.8283, -98.5795]);
+    const [viewZoom, setViewZoom] = useState(4);
+
     useEffect(() => {
         const interval = setInterval(() => {
             setRadarTime(new Date().getTime());
@@ -45,19 +48,54 @@ export default function Map() {
         return () => clearInterval(interval);
     }, []);
 
+    const handleRadarChange = (siteId: string) => {
+        setCurrentRadar(siteId);
+        const site = radarSites.find(s => s.id === siteId);
+        if (site) {
+            setViewCenter([site.lat, site.lon]);
+            setViewZoom(8);
+        } else {
+            setViewCenter([39.8283, -98.5795]);
+            setViewZoom(4);
+        }
+    };
+
+    // Component to sync map view
+    function ViewSync() {
+        const map = useMap();
+        useEffect(() => {
+            map.setView(viewCenter, viewZoom, { animate: true, duration: 1.5 });
+        }, [viewCenter, viewZoom]);
+
+        // Radar Sweep centered on active site
+        const beamCenter = activeSite ? map.latLngToContainerPoint([activeSite.lat, activeSite.lon]) : map.latLngToContainerPoint(viewCenter);
+
+        return (
+            <div
+                className="absolute inset-0 pointer-events-none z-[1000] overflow-hidden opacity-20"
+                style={{ clipPath: 'inset(0 0 0 0)' }}
+            >
+                <div
+                    className="absolute w-[200vmax] h-[200vmax] bg-[conic-gradient(from_0deg,transparent_0deg,rgba(52,211,153,0.5)_15deg,transparent_30deg)] animate-radar-sweep"
+                    style={{
+                        left: `${beamCenter.x}px`,
+                        top: `${beamCenter.y}px`,
+                        transform: 'translate(-50%, -50%)'
+                    }}
+                ></div>
+            </div>
+        );
+    }
+
     return (
         <div className="relative h-full w-full">
-            {/* Visual Sweep Animation */}
-            <div className="absolute inset-0 pointer-events-none z-[1000] overflow-hidden opacity-10">
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200vmax] h-[200vmax] bg-[conic-gradient(from_0deg,transparent_0deg,rgba(52,211,153,0.4)_20deg,transparent_40deg)] animate-radar-sweep shadow-[0_0_50px_rgba(52,211,153,0.3)]"></div>
-            </div>
-
             <MapContainer
-                center={[39.8283, -98.5795]}
-                zoom={4}
+                center={viewCenter}
+                zoom={viewZoom}
                 className="h-full w-full bg-slate-900"
                 zoomControl={false}
             >
+                <ViewSync />
                 <LayersControl position="topright">
                     <LayersControl.BaseLayer checked name="Dark Matter">
                         <TileLayer
@@ -107,7 +145,7 @@ export default function Map() {
                         position={[site.lat, site.lon]}
                         icon={radarIcon}
                         eventHandlers={{
-                            click: () => setCurrentRadar(site.id)
+                            click: () => handleRadarChange(site.id)
                         }}
                     >
                         <Tooltip direction="top" offset={[0, -8]} opacity={1} permanent={false}>
@@ -130,7 +168,7 @@ export default function Map() {
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                         {currentRadar !== 'composite' && (
                             <button
-                                onClick={() => setCurrentRadar('composite')}
+                                onClick={() => handleRadarChange('composite')}
                                 className="text-[8px] bg-slate-700 px-1 rounded hover:bg-slate-600 transition text-slate-300"
                             >
                                 RESET
@@ -151,7 +189,7 @@ export default function Map() {
                     {radarSites.map((site) => (
                         <button
                             key={site.id}
-                            onClick={() => setCurrentRadar(site.id)}
+                            onClick={() => handleRadarChange(site.id)}
                             className={`w-full text-left px-2 py-1.5 rounded text-xs transition-all duration-200 border ${currentRadar === site.id
                                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30 font-semibold'
                                 : 'text-slate-300 hover:bg-white/5 border-transparent'
