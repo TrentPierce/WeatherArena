@@ -36,8 +36,8 @@ def get_supabase_http_config() -> Optional[Dict[str, Any]]:
     Returns:
         Dictionary with base_url and headers or None if credentials missing
     """
-    supabase_url = os.getenv('SUPABASE_URL')
-    supabase_key = os.getenv('SUPABASE_KEY')
+    supabase_url = os.getenv('SUPABASE_URL', '').strip()
+    supabase_key = os.getenv('SUPABASE_KEY', '').strip()
 
     if not supabase_url or not supabase_key:
         logger.error("Missing Supabase credentials: SUPABASE_URL and SUPABASE_KEY required")

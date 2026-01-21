@@ -46,16 +46,46 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Step 5: Grant permissions (adjust if using a different auth method)
--- Grant read access to authenticated users for rankings table
+-- Step 5: Enable Row Level Security (RLS)
+ALTER TABLE model_rankings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE model_verification_logs ENABLE ROW LEVEL SECURITY;
+
+-- Step 6: Create RLS policies for public read access (required for website)
+-- Allow anyone to read model_rankings
+CREATE POLICY "Allow public read access to model_rankings" 
+ON model_rankings FOR SELECT 
+TO anon, authenticated
+USING (true);
+
+-- Allow anyone to read model_verification_logs
+CREATE POLICY "Allow public read access to model_verification_logs" 
+ON model_verification_logs FOR SELECT 
+TO anon, authenticated
+USING (true);
+
+-- Allow service_role to insert/update/delete (for the GitHub Action)
+CREATE POLICY "Allow service_role full access to model_rankings" 
+ON model_rankings FOR ALL 
+TO service_role
+USING (true);
+
+CREATE POLICY "Allow service_role full access to model_verification_logs" 
+ON model_verification_logs FOR ALL 
+TO service_role
+USING (true);
+
+-- Step 7: Grant permissions
+-- Grant read access to anon (anonymous/public) and authenticated users
+GRANT SELECT ON model_rankings TO anon;
+GRANT SELECT ON model_verification_logs TO anon;
 GRANT SELECT ON model_rankings TO authenticated;
 GRANT SELECT ON model_verification_logs TO authenticated;
 
--- Grant all permissions to service_role (should already have these)
+-- Grant all permissions to service_role (for GitHub Action writes)
 GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role;
 
--- Step 6: Verify tables were created
+-- Step 8: Verify tables were created
 SELECT
     tablename,
     tableowner
